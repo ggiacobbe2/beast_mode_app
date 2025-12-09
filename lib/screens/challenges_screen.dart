@@ -124,18 +124,15 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                 const Text("No active challenges right now."),
               
               if (activeChallenges.isNotEmpty)
-                GridView.builder(
+                ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.3,
-                  ),
                   itemCount: activeChallenges.length,
                   itemBuilder: (context, index) {
-                    return _buildChallengeCard(activeChallenges[index]);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildChallengeCard(activeChallenges[index]),
+                    );
                   },
                 ),
 
@@ -183,20 +180,26 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
 
   Widget _buildChallengeCard(Challenge challenge) {
     return Card(
-      elevation: 2,
+      elevation: 3,
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(challenge.title,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text(challenge.description, maxLines: 4, overflow: TextOverflow.ellipsis),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Text(
+              challenge.description,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
             Text("Author: ${challenge.author}"),
             Text("Difficulty: ${challenge.difficulty}"),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
 
             if (!challenge.isJoined)
               ElevatedButton(
