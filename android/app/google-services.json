@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "868216125774",
+    "project_id": "beastmode-8c659",
+    "storage_bucket": "beastmode-8c659.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:868216125774:android:73e7e584a748065b52c61f",
+        "android_client_info": {
+          "package_name": "com.example.beast_mode"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-F-gD9l3fuXt3QrnafxkHYicAcozgmBQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
