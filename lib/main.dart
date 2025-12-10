@@ -1,13 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/login_screen.dart';
+import 'screens/home_feed_screen.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    if (Firebase.apps.isEmpty) {
+      // On mobile the default app is configured via google-services plist/json.
+      // Only pass explicit options when needed (web/desktop).
+      await Firebase.initializeApp(
+        options: kIsWeb ? DefaultFirebaseOptions.currentPlatform : null,
+      );
+    }
+  } catch (e) {
+    final message = e.toString();
+    if (!message.contains('duplicate-app')) {
+      rethrow;
+    }
+    // Already initialized by native auto-init; safe to continue.
+  }
 
   runApp(const BeastModeApp());
 }
@@ -21,7 +36,32 @@ class BeastModeApp extends StatelessWidget {
       title: 'BeastMode',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const LoginScreen(),
+      home: const AuthGate(),
+    );
+  }
+}
+
+/// Listens to auth state and routes to the right screen.
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasData) {
+          return const HomeFeedScreen();
+        }
+
+        return const LoginScreen();
+      },
     );
   }
 }

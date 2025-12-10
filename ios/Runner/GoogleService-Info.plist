@@ -4,27 +4,27 @@
 <dict>
 	<key>API_KEY</key>
 	<string>AIzaSyBMNWWD11jlDBQrAl0xDk578P2yghRDvJo</string>
-	<key>GCM_SENDER_ID</key>
-	<string>868216125774</string>
-	<key>PLIST_VERSION</key>
-	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>com.example.beastMode</string>
+	<key>GCM_SENDER_ID</key>
+	<string>868216125774</string>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:868216125774:ios:4da950020a8e037d52c61f</string>
+	<key>IS_ADS_ENABLED</key>
+	<false/>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false/>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true/>
+	<key>IS_GCM_ENABLED</key>
+	<true/>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true/>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
 	<key>PROJECT_ID</key>
 	<string>beastmode-8c659</string>
 	<key>STORAGE_BUCKET</key>
 	<string>beastmode-8c659.firebasestorage.app</string>
-	<key>IS_ADS_ENABLED</key>
-	<false></false>
-	<key>IS_ANALYTICS_ENABLED</key>
-	<false></false>
-	<key>IS_APPINVITE_ENABLED</key>
-	<true></true>
-	<key>IS_GCM_ENABLED</key>
-	<true></true>
-	<key>IS_SIGNIN_ENABLED</key>
-	<true></true>
-	<key>GOOGLE_APP_ID</key>
-	<string>1:868216125774:ios:4da950020a8e037d52c61f</string>
 </dict>
 </plist>

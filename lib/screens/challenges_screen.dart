@@ -1,39 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/firestore_service.dart';
 import 'home_feed_screen.dart';
 import 'workout_log_screen.dart';
 import 'photo_journal_screen.dart';
 import 'profile_screen.dart';
 import 'new_challenge.dart';
-
-class Challenge {
-  final String id;
-  final String title;
-  final String description;
-  final String author;
-  final DateTime startDate;
-  final DateTime endDate;
-  final String difficulty;
-
-  bool isJoined;
-  bool isCompleted;
-
-  Challenge({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.author,
-    required this.startDate,
-    required this.endDate,
-    required this.difficulty,
-    this.isJoined = false,
-    this.isCompleted = false,
-  });
-
-  bool get isActive {
-    final now = DateTime.now();
-    return now.isAfter(startDate) && now.isBefore(endDate);
-  }
-}
+import 'pushup_challenge_screen.dart';
 
 class ChallengesScreen extends StatefulWidget {
   const ChallengesScreen({super.key});
@@ -44,36 +18,8 @@ class ChallengesScreen extends StatefulWidget {
 
 class _ChallengesScreenState extends State<ChallengesScreen> {
   int _currentIndex = 1;
-
-  List<Challenge> challenges = [
-    Challenge(
-      id: "1",
-      title: "10K Steps Daily",
-      description: "Walk 10,000 steps every day this week.",
-      author: "Penny",
-      startDate: DateTime(2025, 12, 1),
-      endDate: DateTime(2025, 12, 8),
-      difficulty: "Easy",
-    ),
-    Challenge(
-      id: "2",
-      title: "50 Pushups a Day",
-      description: "Complete 50 pushups every day for 14 days.",
-      author: "Ryan",
-      startDate: DateTime(2025, 12, 1),
-      endDate: DateTime(2025, 12, 15),
-      difficulty: "Medium",
-    ),
-    Challenge(
-      id: "3",
-      title: "Earn a New PR",
-      description: "Set a new personal record in any lift by the end of the month.",
-      author: "Nick",
-      startDate: DateTime(2025, 12, 1),
-      endDate: DateTime(2026, 1, 1),
-      difficulty: "Hard",
-    ),
-  ];
+  final ChallengeService _challengeService = ChallengeService();
+  final Set<String> _localJoined = {};
 
   void _onTabTapped(int index) {
     if (index == _currentIndex) return;
@@ -100,11 +46,12 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final activeChallenges = challenges.where((c) => c.isActive).toList();
-    final yourChallenges =
-        challenges.where((c) => c.isJoined || c.isCompleted).toList();
+  void initState() {
+    super.initState();
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Challenges"),
@@ -116,40 +63,54 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                "Active Challenges",
+                "All Challenges",
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-              if (activeChallenges.isEmpty)
-                const Text("No active challenges right now."),
-              
-              if (activeChallenges.isNotEmpty)
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.3,
-                  ),
-                  itemCount: activeChallenges.length,
-                  itemBuilder: (context, index) {
-                    return _buildChallengeCard(activeChallenges[index]);
+              Card(
+                color: Colors.orange.shade50,
+                child: ListTile(
+                  title: const Text("50 Push-ups/Day (7 days)"),
+                  subtitle: const Text("Join and log 50 push-ups daily."),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const PushupChallengeScreen()),
+                    );
                   },
                 ),
-
-              const SizedBox(height: 30),
-
-              const Text(
-                "Your Challenges",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 12),
-              if (yourChallenges.isEmpty)
-                const Text("You haven’t joined any challenges yet."),
-              for (var challenge in yourChallenges)
-                _buildYourChallengeCard(challenge),
+              const SizedBox(height: 16),
+              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: _challengeService.streamActiveChallenges(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Text('Failed to load challenges: ${snapshot.error}');
+                  }
+                  final docs = snapshot.data?.docs ?? [];
+                  if (docs.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 1.3,
+                    ),
+                    itemCount: docs.length,
+                    itemBuilder: (context, index) {
+                      return _buildChallengeCard(docs[index]);
+                    },
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -166,8 +127,8 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: _onTabTapped,
-        selectedItemColor: Colors.black,
-        unselectedItemColor: Colors.grey,
+        selectedItemColor: Theme.of(context).colorScheme.secondary,
+        unselectedItemColor: Theme.of(context).colorScheme.secondary.withOpacity(0.6),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(
@@ -181,7 +142,39 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
     );
   }
 
-  Widget _buildChallengeCard(Challenge challenge) {
+  Widget _buildChallengeCard(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      return _challengeCardContent(doc, isJoined: false, onJoin: null);
+    }
+
+    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      future: FirebaseFirestore.instance
+          .collection('challenges')
+          .doc(doc.id)
+          .collection('participants')
+          .doc(uid)
+          .get(),
+      builder: (context, snapshot) {
+        final remoteJoined = snapshot.data?.exists ?? false;
+        final isJoined = remoteJoined || _localJoined.contains(doc.id);
+        return _challengeCardContent(
+          doc,
+          isJoined: isJoined,
+          onJoin: () => _joinChallenge(doc.id),
+        );
+      },
+    );
+  }
+
+  Widget _challengeCardContent(QueryDocumentSnapshot<Map<String, dynamic>> doc,
+      {required bool isJoined, VoidCallback? onJoin}) {
+    final data = doc.data();
+    final tsStart = data['startDate'] as Timestamp?;
+    final tsEnd = data['endDate'] as Timestamp?;
+    final difficulty = data['difficulty'] as String? ?? 'N/A';
+    final author = data['authorName'] as String? ?? 'Unknown';
+
     return Card(
       elevation: 2,
       child: Padding(
@@ -189,35 +182,31 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(challenge.title,
+            Text(data['title'] as String? ?? 'Untitled',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(challenge.description, maxLines: 4, overflow: TextOverflow.ellipsis),
+            Text(data['description'] as String? ?? '',
+                maxLines: 4, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
-            Text("Author: ${challenge.author}"),
-            Text("Difficulty: ${challenge.difficulty}"),
+            Text("Author: $author"),
+            Text("Difficulty: $difficulty"),
+            if (tsStart != null && tsEnd != null)
+              Text(
+                "${tsStart.toDate().month}/${tsStart.toDate().day} - ${tsEnd.toDate().month}/${tsEnd.toDate().day}",
+                style: TextStyle(color: Colors.grey[700], fontSize: 12),
+              ),
             const SizedBox(height: 8),
 
-            if (!challenge.isJoined)
+            if (!isJoined)
               ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    challenge.isJoined = true;
-                  });
-                },
+                onPressed: onJoin,
                 child: const Text("Join Challenge"),
               ),
 
-            if (challenge.isJoined && !challenge.isCompleted)
+            if (isJoined)
               const Text(
-                "In Progress",
+                "Joined",
                 style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
-              ),
-
-            if (challenge.isCompleted)
-              const Text(
-                "Completed",
-                style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
               ),
           ],
         ),
@@ -225,71 +214,18 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
     );
   }
 
-  Widget _buildYourChallengeCard(Challenge challenge) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 1,
-      color: challenge.isCompleted ? Colors.green.shade50 : Colors.orange.shade50,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(challenge.title,
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold)),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.red),
-                  onPressed: () {
-                    setState(() {
-                      challenge.isJoined = false;
-                      challenge.isCompleted = false;
-                    });
-                  },
-                ),
-              ],
-            ),
-            Text(challenge.description),
-            const SizedBox(height: 8),
-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  challenge.isCompleted ? "Completed" : "In Progress",
-                  style: TextStyle(
-                    color: challenge.isCompleted ? Colors.green : Colors.orange,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                if (!challenge.isCompleted)
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        challenge.isCompleted = true;
-                      });
-                    },
-                    child: const Text("Mark as Completed"),
-                  ),
-                  
-                if (challenge.isCompleted)
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        challenge.isCompleted = false;
-                      });
-                    },
-                    child: const Text("Undo"),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+  Future<void> _joinChallenge(String id) async {
+    try {
+      await _challengeService.joinChallenge(id);
+      setState(() {
+        _localJoined.add(id);
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Join failed: $e')),
+        );
+      }
+    }
   }
 }

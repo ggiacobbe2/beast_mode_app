@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner() {
+      return isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    function wasOwner() {
+      return isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /workouts/{workoutId} {
+      allow read: if wasOwner();
+      allow create: if isOwner();
+      allow update, delete: if wasOwner();
+    }
+
+    match /journalPhotos/{entryId} {
+      allow read: if wasOwner();
+      allow create: if isOwner();
+      allow update, delete: if wasOwner();
+    }
+
+    match /feed/{feedId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner();
+      allow update, delete: if wasOwner() && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    match /challenges/{challengeId} {
+      allow read: if isSignedIn();
+      // Challenge creation/edits are restricted; adjust as needed for admins.
+      allow write: if false;
+
+      match /participants/{userId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /progress/{userId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+  }
+}
