@@ -1,4 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import '../services/firestore_service.dart';
+import '../services/storage_service.dart';
+import '../services/auth_service.dart';
 import 'home_feed_screen.dart';
 import 'challenges_screen.dart';
 import 'workout_log_screen.dart';
@@ -14,20 +21,12 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   int _currentIndex = 4;
 
-  // temp data to be replaced later
-  String name = "User Example";
-  String email = "user@example.com";
-  String dob = "Not set";
-  String gender = "Not set";
-
-
-  final List<Map<String, dynamic>> userPosts = [
-    {
-      "caption": "Loving my workouts!",
-      "image": "assets/images/gym_woman_crunch.jpeg",
-      "date": DateTime(2025, 1, 10),
-    },
-  ];
+  final UserProfileService _profileService = UserProfileService();
+  final WorkoutService _workoutService = WorkoutService();
+  final PhotoJournalService _journalService = PhotoJournalService();
+  final auth = FirebaseAuth.instance;
+  final ImagePicker _picker = ImagePicker();
+  bool _uploadingPhoto = false;
 
   void _onTabTapped(int index) {
     if (index == _currentIndex) return;
@@ -40,10 +39,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-    void _editProfile() async {
-    TextEditingController nameCtrl = TextEditingController(text: name);
-    TextEditingController dobCtrl = TextEditingController(text: dob);
-    TextEditingController genderCtrl = TextEditingController(text: gender);
+    void _editProfile(Map<String, dynamic> data) async {
+    TextEditingController nameCtrl = TextEditingController(text: data['name'] as String? ?? '');
+    TextEditingController dobCtrl = TextEditingController(text: data['dob'] as String? ?? '');
+    TextEditingController genderCtrl = TextEditingController(text: data['gender'] as String? ?? '');
 
     await showDialog(
       context: context,
@@ -61,11 +60,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
           ElevatedButton(
             onPressed: () {
-              setState(() {
-                name = nameCtrl.text;
-                dob = dobCtrl.text;
-                gender = genderCtrl.text;
-              });
+              _profileService.upsertProfile(
+                uid: auth.currentUser!.uid,
+                data: {
+                  'name': nameCtrl.text,
+                  'dob': dobCtrl.text,
+                  'gender': genderCtrl.text,
+                },
+              );
               Navigator.pop(context);
             },
             child: const Text("Save"),
@@ -88,7 +90,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
- Widget _postCard(Map<String, dynamic> post) {
+Widget _postCard(Map<String, dynamic> post) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -120,55 +122,245 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _workoutItem(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data() ?? {};
+    final ts = data['createdAt'] as Timestamp?;
+    final date = ts?.toDate();
+    final duration = data['durationMinutes'];
+    final notes = data['notes'] as String?;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        title: Text(data['title'] as String? ?? 'Workout'),
+        subtitle: Text([
+          if (duration != null) "$duration min",
+          if (date != null) "${date.month}/${date.day}/${date.year}",
+        ].join(" • ")),
+        trailing: const Icon(Icons.fitness_center),
+        onTap: notes != null && notes.isNotEmpty
+            ? () {
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: Text(data['title'] as String? ?? 'Workout'),
+                    content: Text(notes),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Close'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+            : null,
+      ),
+    );
+  }
+
+  Widget _journalItem(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data() ?? {};
+    final ts = data['createdAt'] as Timestamp?;
+    final date = ts?.toDate();
+    final imageUrl = data['imageUrl'] as String?;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (imageUrl != null && imageUrl.isNotEmpty)
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+              child: Image.network(
+                imageUrl,
+                height: 160,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  height: 160,
+                  color: Colors.grey.shade200,
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.broken_image),
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  data['title'] as String? ?? 'Entry',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  data['caption'] as String? ?? '',
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  date != null ? "${date.month}/${date.day}/${date.year}" : '',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final uid = auth.currentUser?.uid;
+    if (uid == null) {
+      return const Scaffold(body: Center(child: Text('Not signed in')));
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Profile"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: _editProfile,
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await AuthService().logout();
+            },
           )
         ],
       ),
 
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Row(
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _profileService.streamProfile(uid),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(child: Text('Failed to load profile: ${snapshot.error}'));
+          }
+
+          final data = snapshot.data?.data() ?? {};
+          final name = data['name'] as String? ?? 'Athlete';
+          final email = data['email'] as String? ?? auth.currentUser?.email ?? '';
+          final dob = data['dob'] as String? ?? 'Not set';
+          final gender = data['gender'] as String? ?? 'Not set';
+
+          return ListView(
+            padding: const EdgeInsets.all(16),
             children: [
-              const CircleAvatar(
-                radius: 35,
-                backgroundColor: Colors.grey,
-                // backgroundImage: add pfp here,
+              Row(
+                children: [
+                  Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 35,
+                        backgroundColor: Colors.grey.shade300,
+                        backgroundImage: (data['photoUrl'] as String?) != null
+                            ? NetworkImage(data['photoUrl'] as String)
+                            : null,
+                        child: (data['photoUrl'] as String?) == null
+                            ? const Icon(Icons.person, size: 32, color: Colors.white70)
+                            : null,
+                      ),
+                      Positioned(
+                        bottom: -4,
+                        right: -4,
+                        child: IconButton(
+                          icon: _uploadingPhoto
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.camera_alt, size: 20),
+                          onPressed: _uploadingPhoto ? null : () => _changePhoto(uid),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    onPressed: () => _editProfile(data),
+                  ),
+                ],
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  name,
-                  style: const TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.bold),
-                ),
+
+              const SizedBox(height: 20),
+
+              _profileDetail("Email", email),
+              _profileDetail("Date of Birth", dob),
+              _profileDetail("Gender", gender),
+
+              const SizedBox(height: 24),
+              const Text(
+                "Your Posts",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+
+              const Text(
+                "Workouts",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: _workoutService.streamUserWorkouts(uid),
+                builder: (context, workoutSnap) {
+                  if (workoutSnap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (workoutSnap.hasError) {
+                    return Text('Failed to load workouts: ${workoutSnap.error}');
+                  }
+                  final docs = workoutSnap.data?.docs ?? [];
+                  if (docs.isEmpty) {
+                    return const Text("No workouts yet.");
+                  }
+                  return Column(
+                    children: docs.map(_workoutItem).toList(),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 16),
+              const Text(
+                "Journal",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: _journalService.streamEntries(uid),
+                builder: (context, journalSnap) {
+                  if (journalSnap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (journalSnap.hasError) {
+                    return Text('Failed to load journal: ${journalSnap.error}');
+                  }
+                  final docs = journalSnap.data?.docs ?? [];
+                  if (docs.isEmpty) {
+                    return const Text("No journal entries yet.");
+                  }
+                  return Column(
+                    children: docs.map(_journalItem).toList(),
+                  );
+                },
               ),
             ],
-          ),
-
-          const SizedBox(height: 20),
-
-          _profileDetail("Email", email),
-          _profileDetail("Date of Birth", dob),
-          _profileDetail("Gender", gender),
-
-          const SizedBox(height: 24),
-          const Text(
-            "Your Posts",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-
-          for (var post in userPosts) _postCard(post),
-        ],
+          );
+        },
       ),
 
       bottomNavigationBar: BottomNavigationBar(
@@ -183,5 +375,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _changePhoto(String uid) async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (picked == null) return;
+    setState(() => _uploadingPhoto = true);
+    try {
+      final url = await StorageService()
+          .uploadProfileImage(uid: uid, file: File(picked.path));
+      await _profileService.upsertProfile(uid: uid, data: {'photoUrl': url});
+      await auth.currentUser?.updatePhotoURL(url);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Photo upload failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
   }
 }
