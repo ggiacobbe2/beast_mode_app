@@ -67,16 +67,18 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-              Card(
-                color: Colors.orange.shade50,
-                child: ListTile(
-                  title: const Text("50 Push-ups/Day (7 days)"),
-                  subtitle: const Text("Join and log 50 push-ups daily."),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const PushupChallengeScreen()),
+              if (activeChallenges.isEmpty)
+                const Text("No active challenges right now."),
+              
+              if (activeChallenges.isNotEmpty)
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: activeChallenges.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildChallengeCard(activeChallenges[index]),
                     );
                   },
                 ),
@@ -176,26 +178,26 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
     final author = data['authorName'] as String? ?? 'Unknown';
 
     return Card(
-      elevation: 2,
+      elevation: 3,
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(data['title'] as String? ?? 'Untitled',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(challenge.title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Text(
+              challenge.description,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
-            Text(data['description'] as String? ?? '',
-                maxLines: 4, overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 4),
-            Text("Author: $author"),
-            Text("Difficulty: $difficulty"),
-            if (tsStart != null && tsEnd != null)
-              Text(
-                "${tsStart.toDate().month}/${tsStart.toDate().day} - ${tsEnd.toDate().month}/${tsEnd.toDate().day}",
-                style: TextStyle(color: Colors.grey[700], fontSize: 12),
-              ),
-            const SizedBox(height: 8),
+            Text("Author: ${challenge.author}"),
+            Text("Difficulty: ${challenge.difficulty}"),
+            const SizedBox(height: 10),
 
             if (!isJoined)
               ElevatedButton(
