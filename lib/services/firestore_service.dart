@@ -47,8 +47,21 @@ class WorkoutService {
     await _workouts.doc(id).update(data);
   }
 
-  Future<void> deleteWorkout(String id) async {
-    await _workouts.doc(id).delete();
+  Future<void> deleteWorkout(String workoutId) async {
+    final batch = FirebaseFirestore.instance.batch();
+
+    batch.delete(_workouts.doc(workoutId));
+
+    final feedSnap = await FirebaseFirestore.instance
+        .collection('feed')
+        .where('workoutId', isEqualTo: workoutId)
+        .get();
+
+    for (final doc in feedSnap.docs) {
+      batch.delete(doc.reference);
+    }
+
+    await batch.commit();
   }
 }
 
@@ -73,6 +86,16 @@ class FeedService {
       'ownerId': uid,
       'createdAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  Future<void> deleteFeedEntry(String workoutId) async {
+    final snap = await _feed
+        .where('workoutId', isEqualTo: workoutId)
+        .get();
+
+    for (final doc in snap.docs) {
+      await doc.reference.delete();
+    }
   }
 }
 
