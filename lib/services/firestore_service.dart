@@ -130,6 +130,27 @@ class ChallengeService {
     }, SetOptions(merge: true));
   }
 
+  Future<void> createChallenge({
+    required String title,
+    required String description,
+    required String difficulty,
+    required String authorUid,
+    required String authorName,
+    DateTime? endDate,
+  }) async {
+    await _challenges.add({
+      'title': title,
+      'description': description,
+      'difficulty': difficulty,
+      'authorUid': authorUid,
+      'authorName': authorName,
+      'createdAt': FieldValue.serverTimestamp(),
+      'endDate': endDate != null
+          ? Timestamp.fromDate(endDate)
+          : Timestamp.fromDate(DateTime.now().add(const Duration(days: 30))),
+    });
+  }
+
   Stream<DocumentSnapshot<Map<String, dynamic>>> streamProgress(
       String challengeId, String uid) {
     return _challenges
