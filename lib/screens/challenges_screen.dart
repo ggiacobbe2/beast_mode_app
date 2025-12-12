@@ -67,22 +67,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
-              if (activeChallenges.isEmpty)
-                const Text("No active challenges right now."),
-              
-              if (activeChallenges.isNotEmpty)
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: activeChallenges.length,
-                  itemBuilder: (context, index) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildChallengeCard(activeChallenges[index]),
-                    );
-                  },
-                ),
-              ),
+              _pushupChallengeCard(),
               const SizedBox(height: 16),
               StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: _challengeService.streamActiveChallenges(),
@@ -169,11 +154,84 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
     );
   }
 
+  Widget _pushupChallengeCard() {
+    const challengeId = 'pushup_50_per_day_week';
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Text(
+                  "Featured Challenge",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                SizedBox(width: 8),
+                Chip(
+                  label: Text("Push-ups"),
+                  backgroundColor: Colors.orangeAccent,
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              "50 Push-ups a Day for 7 Days",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            const Text("Log daily reps; hit 50+ to stay on track."),
+            const SizedBox(height: 10),
+            if (uid == null)
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const PushupChallengeScreen()));
+                },
+                child: const Text("Open Challenge"),
+              )
+            else
+              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: _challengeService.streamParticipant(challengeId, uid),
+                builder: (context, snapshot) {
+                  final joined = snapshot.data?.exists ?? false;
+                  return Row(
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const PushupChallengeScreen()),
+                          );
+                        },
+                        child: const Text("Open Challenge"),
+                      ),
+                      const SizedBox(width: 8),
+                      if (joined)
+                        const Text(
+                          "Joined",
+                          style: TextStyle(
+                              color: Colors.orange, fontWeight: FontWeight.bold),
+                        ),
+                    ],
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _challengeCardContent(QueryDocumentSnapshot<Map<String, dynamic>> doc,
       {required bool isJoined, VoidCallback? onJoin}) {
     final data = doc.data();
-    final tsStart = data['startDate'] as Timestamp?;
-    final tsEnd = data['endDate'] as Timestamp?;
+    final title = data['title'] as String? ?? 'Untitled challenge';
+    final description = data['description'] as String? ?? 'No description';
     final difficulty = data['difficulty'] as String? ?? 'N/A';
     final author = data['authorName'] as String? ?? 'Unknown';
 
@@ -185,18 +243,18 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(challenge.title,
+            Text(title,
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             Text(
-              challenge.description,
+              description,
               maxLines: 4,
               overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
-            Text("Author: ${challenge.author}"),
-            Text("Difficulty: ${challenge.difficulty}"),
+            Text("Author: $author"),
+            Text("Difficulty: $difficulty"),
             const SizedBox(height: 10),
 
             if (!isJoined)
