@@ -7,7 +7,7 @@ import 'workout_log_screen.dart';
 import 'photo_journal_screen.dart';
 import 'profile_screen.dart';
 import 'new_challenge.dart';
-import 'pushup_challenge_screen.dart';
+import 'challenge_detail_screen.dart';
 
 class ChallengesScreen extends StatefulWidget {
   const ChallengesScreen({super.key});
@@ -28,8 +28,6 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
         Navigator.pushReplacement(
             context, MaterialPageRoute(builder: (_) => HomeFeedScreen()));
         break;
-      case 1:
-        break;
       case 2:
         Navigator.pushReplacement(
             context, MaterialPageRoute(builder: (_) => WorkoutLogScreen()));
@@ -46,76 +44,68 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Challenges"),
-      ),
+      appBar: AppBar(title: const Text("Challenges")),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "All Challenges",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              _pushupChallengeCard(),
-              const SizedBox(height: 16),
-              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: _challengeService.streamActiveChallenges(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return Text('Failed to load challenges: ${snapshot.error}');
-                  }
-                  final docs = snapshot.data?.docs ?? [];
-                  if (docs.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 1.3,
-                    ),
-                    itemCount: docs.length,
-                    itemBuilder: (context, index) {
-                      return _buildChallengeCard(docs[index]);
-                    },
-                  );
-                },
-              ),
-            ],
-          ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Featured Challenges",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            _featuredChallenges(),
+            const SizedBox(height: 24),
+
+            const Text("All Challenges",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _challengeService.streamActiveChallenges(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Text('Failed to load challenges: ${snapshot.error}');
+                }
+
+                final docs = snapshot.data?.docs ?? [];
+                if (docs.isEmpty) return const SizedBox.shrink();
+
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: docs.length,
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 1,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 2.1,
+                  ),
+                  itemBuilder: (context, index) =>
+                      _buildChallengeCard(docs[index]),
+                );
+              },
+            ),
+          ],
         ),
       ),
 
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const NewChallenge()));
-        },
         child: const Icon(Icons.add),
+        onPressed: () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const NewChallenge())),
       ),
 
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: _onTabTapped,
         selectedItemColor: Theme.of(context).colorScheme.secondary,
-        unselectedItemColor: Theme.of(context).colorScheme.secondary.withOpacity(0.6),
+        unselectedItemColor:
+            Theme.of(context).colorScheme.secondary.withOpacity(0.6),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(
@@ -131,8 +121,28 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
 
   Widget _buildChallengeCard(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    void open() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChallengeDetailScreen(
+            challengeId: doc.id,
+            title: doc.data()['title'] ?? 'Untitled',
+            description: doc.data()['description'] ?? '',
+            difficulty: doc.data()['difficulty'] ?? 'N/A',
+          ),
+        ),
+      );
+    }
+
     if (uid == null) {
-      return _challengeCardContent(doc, isJoined: false, onJoin: null);
+      return _challengeCardContent(
+        doc,
+        isJoined: false,
+        onOpen: open,
+        onJoin: null,
+      );
     }
 
     return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -143,149 +153,123 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
           .doc(uid)
           .get(),
       builder: (context, snapshot) {
-        final remoteJoined = snapshot.data?.exists ?? false;
-        final isJoined = remoteJoined || _localJoined.contains(doc.id);
+        final bool isJoined =
+          (snapshot.data?.exists ?? false) || _localJoined.contains(doc.id);
+
+        final VoidCallback onJoin = isJoined
+            ? () => _leaveChallenge(doc.id)
+            : () => _joinChallenge(doc.id);
+
         return _challengeCardContent(
           doc,
           isJoined: isJoined,
-          onJoin: () => _joinChallenge(doc.id),
+          onOpen: open,
+          onJoin: onJoin,
         );
       },
     );
   }
 
-  Widget _pushupChallengeCard() {
-    const challengeId = 'pushup_50_per_day_week';
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+  Widget _challengeCardContent(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc, {
+    required bool isJoined,
+    VoidCallback? onJoin,
+    VoidCallback? onOpen,
+  }) {
+    final data = doc.data();
+
     return Card(
-      elevation: 4,
+      elevation: 3,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(data['title'] ?? 'Untitled',
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Text(data['description'] ?? 'No description',
+                maxLines: 3, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 4),
+            Text("Difficulty: ${data['difficulty'] ?? 'N/A'}"),
+            const SizedBox(height: 10),
+
             Row(
-              children: const [
-                Text(
-                  "Featured Challenge",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+              children: [
+                SizedBox(
+                  width: 85,
+                  child: ElevatedButton(
+                    onPressed: onOpen,
+                    child: const Text("Open"),
+                  ),
                 ),
-                SizedBox(width: 8),
-                Chip(
-                  label: Text("Push-ups"),
-                  backgroundColor: Colors.orangeAccent,
+                const SizedBox(width: 12),
+
+                SizedBox(
+                  width: 90,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isJoined ? Colors.grey : Colors.orange,
+                    ),
+                    onPressed: onJoin,
+                    child: Text(isJoined ? "Leave" : "Join"),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            const Text(
-              "50 Push-ups a Day for 7 Days",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 4),
-            const Text("Log daily reps; hit 50+ to stay on track."),
-            const SizedBox(height: 10),
-            if (uid == null)
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const PushupChallengeScreen()));
-                },
-                child: const Text("Open Challenge"),
-              )
-            else
-              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: _challengeService.streamParticipant(challengeId, uid),
-                builder: (context, snapshot) {
-                  final joined = snapshot.data?.exists ?? false;
-                  return Row(
-                    children: [
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const PushupChallengeScreen()),
-                          );
-                        },
-                        child: const Text("Open Challenge"),
-                      ),
-                      const SizedBox(width: 8),
-                      if (joined)
-                        const Text(
-                          "Joined",
-                          style: TextStyle(
-                              color: Colors.orange, fontWeight: FontWeight.bold),
-                        ),
-                    ],
-                  );
-                },
-              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _challengeCardContent(QueryDocumentSnapshot<Map<String, dynamic>> doc,
-      {required bool isJoined, VoidCallback? onJoin}) {
-    final data = doc.data();
-    final title = data['title'] as String? ?? 'Untitled challenge';
-    final description = data['description'] as String? ?? 'No description';
-    final difficulty = data['difficulty'] as String? ?? 'N/A';
-    final author = data['authorName'] as String? ?? 'Unknown';
+  Widget _featuredChallenges() {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('challenges')
+          .where('featured', isEqualTo: true)
+          .where('active', isEqualTo: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Text('Failed to load featured challenges');
+        }
 
-    return Card(
-      elevation: 3,
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            Text(
-              description,
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 4),
-            Text("Author: $author"),
-            Text("Difficulty: $difficulty"),
-            const SizedBox(height: 10),
+        final docs = snapshot.data?.docs ?? [];
+        if (docs.isEmpty) {
+          return const Text("No featured challenges right now.");
+        }
 
-            if (!isJoined)
-              ElevatedButton(
-                onPressed: onJoin,
-                child: const Text("Join Challenge"),
-              ),
-
-            if (isJoined)
-              const Text(
-                "Joined",
-                style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
-              ),
-          ],
-        ),
-      ),
+        return Column(
+          children: docs.map(_buildChallengeCard).toList(),
+        );
+      },
     );
   }
 
   Future<void> _joinChallenge(String id) async {
     try {
       await _challengeService.joinChallenge(id);
-      setState(() {
-        _localJoined.add(id);
-      });
+      setState(() => _localJoined.add(id));
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Join failed: $e')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Join failed: $e')));
+    }
+  }
+
+  Future<void> _leaveChallenge(String id) async {
+    try {
+      await _challengeService.leaveChallenge(id);
+      setState(() => _localJoined.remove(id));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Leave failed: $e')));
     }
   }
 }
