@@ -18,7 +18,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool isLoading = false;
 
   void register() async {
-    setState(() => isLoading = true); // start spinner
+    setState(() => isLoading = true);
 
     String? result = await AuthService().register(
       nameController.text.trim(),
@@ -28,7 +28,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (!mounted) return;
 
-    setState(() => isLoading = false); // stop spinner
+    setState(() => isLoading = false);
 
     if (result == null) {
       Navigator.pushReplacement(

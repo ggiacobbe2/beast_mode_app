@@ -46,6 +46,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     TextEditingController nameCtrl = TextEditingController(text: data['name'] as String? ?? '');
     TextEditingController dobCtrl = TextEditingController(text: data['dob'] as String? ?? '');
     TextEditingController genderCtrl = TextEditingController(text: data['gender'] as String? ?? '');
+    TextEditingController startingWeightCtrl = TextEditingController(text: data['Starting Weight'] as String? ?? '');
+    TextEditingController goalWeightCtrl = TextEditingController(text: data['Current Weight'] as String? ?? '');
 
     await showDialog(
       context: context,
@@ -57,6 +59,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: "Name")),
             TextField(controller: dobCtrl, decoration: const InputDecoration(labelText: "Date of Birth")),
             TextField(controller: genderCtrl, decoration: const InputDecoration(labelText: "Gender")),
+            TextField(controller: startingWeightCtrl, decoration: const InputDecoration(labelText: "Starting Weight")),
+            TextField(controller: goalWeightCtrl, decoration: const InputDecoration(labelText: "Goal Weight")),
           ],
         ),
         actions: [
@@ -69,6 +73,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'name': nameCtrl.text,
                   'dob': dobCtrl.text,
                   'gender': genderCtrl.text,
+                  'starting weight': startingWeightCtrl.text,
+                  'goal weight': goalWeightCtrl.text,
                 },
               );
               Navigator.pop(context);
@@ -184,6 +190,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+    
     final uid = user.uid;
 
     return Scaffold(
@@ -210,6 +217,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final email = data['email'] as String? ?? user.email ?? '';
           final dob = data['dob'] as String? ?? 'Not set';
           final gender = data['gender'] as String? ?? 'Not set';
+          final startingWeight = data['starting weight'] as String? ?? 'Not set';
+          final goalWeight = data['goal weight'] as String? ?? 'Not set';
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -251,6 +260,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _profileDetail("Email", email),
               _profileDetail("Date of Birth", dob),
               _profileDetail("Gender", gender),
+              _profileDetail("Starting Weight", startingWeight),
+              _profileDetail("Goal Weight", goalWeight),
               const SizedBox(height: 24),
               const Text("Your Posts", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),

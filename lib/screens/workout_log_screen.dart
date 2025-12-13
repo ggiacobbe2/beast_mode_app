@@ -7,6 +7,7 @@ import 'challenges_screen.dart';
 import 'photo_journal_screen.dart';
 import 'profile_screen.dart';
 import 'new_workout.dart';
+import 'progress_dashboard_screen.dart';
 
 class WorkoutLogScreen extends StatefulWidget {
   const WorkoutLogScreen({super.key});
@@ -42,61 +43,101 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text("Workout Log")),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _workoutService.streamUserWorkouts(uid),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(child: Text('Failed to load workouts: ${snapshot.error}'));
-          }
-
-          final docs = snapshot.data?.docs ?? [];
-          if (docs.isEmpty) {
-            return const Center(child: Text("No workouts yet. Log your first session!"));
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              final doc = docs[index];
-              final data = doc.data();
-              final ts = data['createdAt'] as Timestamp?;
-              final date = ts?.toDate();
-              final dateLabel = date != null
-                  ? "${date.month}/${date.day}/${date.year}"
-                  : 'Just now';
-              final duration = data['durationMinutes'];
-
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  title: Text(data['title'] as String? ?? 'Workout'),
-                  subtitle: Text([
-                    if (duration != null) "$duration min",
-                    dateLabel
-                  ].join(" • ")),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: _working ? null : () => _editWorkout(doc.id, data),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: _working ? null : () => _confirmDelete(doc.id),
-                      ),
-                    ],
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-              );
-            },
-          );
-        },
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ProgressDashboardScreen(),
+                    ),
+                  );
+                },
+                child: const Text(
+                  "View Progress Dashboard",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ),
+
+          Expanded(
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _workoutService.streamUserWorkouts(uid),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text('Failed to load workouts: ${snapshot.error}'),
+                  );
+                }
+
+                final docs = snapshot.data?.docs ?? [];
+                if (docs.isEmpty) {
+                  return const Center(
+                    child: Text("No workouts yet. Log your first session!"),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    final doc = docs[index];
+                    final data = doc.data();
+                    final ts = data['createdAt'] as Timestamp?;
+                    final date = ts?.toDate();
+                    final dateLabel = date != null
+                        ? "${date.month}/${date.day}/${date.year}"
+                        : 'Just now';
+                    final duration = data['durationMinutes'];
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ListTile(
+                        title: Text(data['title'] as String? ?? 'Workout'),
+                        subtitle: Text([
+                          if (duration != null) "$duration min",
+                          dateLabel
+                        ].join(" • ")),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: _working
+                                  ? null
+                                  : () => _editWorkout(doc.id, data),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed:
+                                  _working ? null : () => _confirmDelete(doc.id),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {

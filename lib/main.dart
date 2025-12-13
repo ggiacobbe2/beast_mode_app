@@ -21,7 +21,7 @@ void main() async {
     if (!message.contains('duplicate-app')) {
       rethrow;
     }
-    // Already initialized by native auto-init; safe to continue.
+
   }
 
   runApp(const BeastModeApp());
@@ -41,7 +41,6 @@ class BeastModeApp extends StatelessWidget {
   }
 }
 
-/// Listens to auth state and routes to the right screen.
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -50,7 +49,6 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // While checking auth state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -59,11 +57,11 @@ class AuthGate extends StatelessWidget {
 
         // Logged in
         if (snapshot.hasData) {
-          return const HomeFeedScreen(); // show main app
+          return const HomeFeedScreen();
         }
 
         // Logged out
-        return const LoginScreen(); // show login
+        return const LoginScreen();
       },
     );
   }
