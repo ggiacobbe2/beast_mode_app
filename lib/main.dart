@@ -21,7 +21,7 @@ void main() async {
     if (!message.contains('duplicate-app')) {
       rethrow;
     }
-    // Already initialized by native auto-init; safe to continue.
+
   }
 
   runApp(const BeastModeApp());
@@ -41,7 +41,6 @@ class BeastModeApp extends StatelessWidget {
   }
 }
 
-/// Listens to auth state and routes to the right screen.
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -56,10 +55,12 @@ class AuthGate extends StatelessWidget {
           );
         }
 
+        // Logged in
         if (snapshot.hasData) {
           return const HomeFeedScreen();
         }
 
+        // Logged out
         return const LoginScreen();
       },
     );

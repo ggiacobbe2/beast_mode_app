@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-/// Minimal Firestore stubs to replace temp UI data with real reads/writes.
 class UserProfileService {
   final _db = FirebaseFirestore.instance;
 

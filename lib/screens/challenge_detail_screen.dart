@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../services/firestore_service.dart';
 
 class ChallengeDetailScreen extends StatefulWidget {
   final String challengeId;
@@ -22,7 +21,6 @@ class ChallengeDetailScreen extends StatefulWidget {
 }
 
 class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
-  final ChallengeService _challengeService = ChallengeService();
   final String? uid = FirebaseAuth.instance.currentUser?.uid;
 
   bool _isJoined = false;
@@ -50,27 +48,40 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
 
   Future<void> _joinChallenge() async {
     if (uid == null) return;
-    await _challengeService.joinChallenge(widget.challengeId);
+    await FirebaseFirestore.instance
+        .collection('challenges')
+        .doc(widget.challengeId)
+        .collection('participants')
+        .doc(uid)
+        .set({'joinedAt': FieldValue.serverTimestamp()});
     setState(() {
       _isJoined = true;
     });
   }
 
-  Future<void> _markDayCompleted(int day) async {
+  Future<void> _toggleDay(int day, bool completed) async {
     if (uid == null) return;
-    await FirebaseFirestore.instance
+    final progressRef = FirebaseFirestore.instance
         .collection('challenges')
         .doc(widget.challengeId)
         .collection('progress')
-        .doc(uid)
-        .set({'day$day': true}, SetOptions(merge: true));
+        .doc(uid);
+
+    await progressRef.set({'day$day': !completed}, SetOptions(merge: true));
+
+    final progressDoc = await progressRef.get();
+    final progressData = progressDoc.data() ?? {};
+
+    final allDaysCompleted = List.generate(
+      7,
+      (i) => progressData['day${i + 1}'] == true,
+    ).every((v) => v);
+
+    await progressRef.set({'completed': allDaysCompleted}, SetOptions(merge: true));
   }
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> _progressStream() {
-    if (uid == null) {
-      // dummy stream for null user
-      return const Stream.empty() as Stream<DocumentSnapshot<Map<String, dynamic>>>;
-    }
+    if (uid == null) return const Stream.empty() as Stream<DocumentSnapshot<Map<String, dynamic>>>;
     return FirebaseFirestore.instance
         .collection('challenges')
         .doc(widget.challengeId)
@@ -82,9 +93,7 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
+      appBar: AppBar(title: Text(widget.title)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
@@ -102,29 +111,50 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
                       child: const Text("Join Challenge"),
                     ),
                   if (_isJoined)
-                    Expanded(
-                      child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                        stream: _progressStream(),
-                        builder: (context, snapshot) {
-                          final progress = snapshot.data?.data() ?? {};
-                          return ListView.builder(
-                            itemCount: 7, // example: 7-day challenge
-                            itemBuilder: (context, index) {
-                              final dayNum = index + 1;
-                              final completed = progress['day$dayNum'] == true;
-                              return ListTile(
-                                title: Text("Day $dayNum"),
-                                trailing: completed
-                                    ? const Icon(Icons.check, color: Colors.green)
-                                    : ElevatedButton(
-                                        onPressed: () => _markDayCompleted(dayNum),
-                                        child: const Text("Complete"),
-                                      ),
-                              );
-                            },
-                          );
-                        },
-                      ),
+                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: _progressStream(),
+                      builder: (context, snapshot) {
+                        final progress = snapshot.data?.data() ?? {};
+
+                        final allDaysCompleted = List.generate(
+                          7,
+                          (i) => progress['day${i + 1}'] == true,
+                        ).every((v) => v);
+
+                        return Column(
+                          children: [
+                            ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: 7,
+                              itemBuilder: (context, index) {
+                                final dayNum = index + 1;
+                                final completed = progress['day$dayNum'] == true;
+
+                                return ListTile(
+                                  title: Text("Day $dayNum"),
+                                  trailing: IconButton(
+                                    icon: Icon(
+                                      completed ? Icons.check_box : Icons.check_box_outline_blank,
+                                      color: completed ? Colors.green : null,
+                                    ),
+                                    onPressed: () => _toggleDay(dayNum, completed),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            if (allDaysCompleted)
+                              const Text(
+                                "Challenge completed!",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                          ],
+                        );
+                      },
                     ),
                 ],
               ),
