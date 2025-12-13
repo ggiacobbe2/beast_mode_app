@@ -26,110 +26,12 @@ class ProgressDashboardScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _challengeProgress(uid),
-            const SizedBox(height: 24),
             _workoutCount(uid),
             const SizedBox(height: 24),
             _weightProgress(uid),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _challengeProgress(String uid) {
-    final challengesRef = FirebaseFirestore.instance.collection('challenges');
-
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: challengesRef.snapshots(),
-      builder: (context, challengesSnapshot) {
-        if (!challengesSnapshot.hasData) return const CircularProgressIndicator();
-
-        final challengeDocs = challengesSnapshot.data!.docs;
-
-        if (challengeDocs.isEmpty) {
-          return const Card(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Text("No challenges available."),
-            ),
-          );
-        }
-
-        final progressStreams = challengeDocs.map((doc) {
-          return doc.reference.collection('progress').doc(uid).snapshots();
-        }).toList();
-
-        return StreamBuilder<List<DocumentSnapshot<Map<String, dynamic>>>>(
-          stream: StreamZip(progressStreams),
-          builder: (context, progressSnapshots) {
-            if (!progressSnapshots.hasData) return const CircularProgressIndicator();
-
-            final completedDifficulties = <String>[];
-
-            for (int i = 0; i < challengeDocs.length; i++) {
-              final progress = progressSnapshots.data![i].data() ?? {};
-
-              final allDaysCompleted = List.generate(
-                      7, (day) => progress['day${day + 1}'] == true)
-                  .every((v) => v);
-
-              if (allDaysCompleted || progress['completed'] == true) {
-                final difficulty = challengeDocs[i].data()['difficulty'] as String?;
-                if (difficulty != null) completedDifficulties.add(difficulty);
-              }
-            }
-
-            final easy = completedDifficulties.where((d) => d == 'easy').length;
-            final medium = completedDifficulties.where((d) => d == 'medium').length;
-            final hard = completedDifficulties.where((d) => d == 'hard').length;
-            final total = easy + medium + hard;
-
-            if (total == 0) {
-              return const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text("No challenges completed yet."),
-                ),
-              );
-            }
-
-            final dataMap = {
-              "Easy": easy.toDouble(),
-              "Medium": medium.toDouble(),
-              "Hard": hard.toDouble(),
-            };
-
-            return Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Text(
-                      "Challenges Completed: $total",
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    PieChart(
-                      dataMap: dataMap,
-                      chartType: ChartType.ring,
-                      chartRadius: 120,
-                      chartValuesOptions: const ChartValuesOptions(
-                        showChartValuesInPercentage: true,
-                      ),
-                      legendOptions: const LegendOptions(
-                        legendPosition: LegendPosition.bottom,
-                      ),
-                      colorList: const [Colors.green, Colors.orange, Colors.red],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
     );
   }
 
